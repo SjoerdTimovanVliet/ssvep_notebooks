@@ -133,6 +133,7 @@ def present(duration=120, eeg=None, save_fn=None):
             print(
                 f"No path for a save file was passed to the experiment. Saving data to {save_fn}"
             )
+        print("Starting EEG stream...")
         eeg.start(save_fn, duration=record_duration)
 
     # Iterate through trials
@@ -172,6 +173,7 @@ def present(duration=120, eeg=None, save_fn=None):
 
     # Cleanup
     if eeg:
+        print("Stopping EEG stream...")
         eeg.stop()
     mywin.close()
 

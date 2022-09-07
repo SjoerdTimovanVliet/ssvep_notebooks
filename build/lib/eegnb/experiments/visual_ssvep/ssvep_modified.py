@@ -1,4 +1,5 @@
 import os
+from this import d
 from time import time
 from glob import glob
 from random import choice
@@ -8,23 +9,34 @@ from pandas import DataFrame
 from psychopy import visual, core, event
 
 from eegnb import generate_save_fn
-
+import pdb
 __title__ = "Visual SSVEP"
 
 
-def present(duration=120, eeg=None, save_fn=None):
+def present(duration=120, eeg=None, save_fn=None, mode='2 stimuli'):
     n_trials = 2010
-    iti = 0.5
-    soa = 3.0
-    jitter = 0.2
-    record_duration = np.float32(duration)
-    markernames = [1, 2]
+    iti = 0.5 # inter-trial interval
+    soa = 10.0 # seconds
+    jitter = 0.2 # jitter the SOA
 
-    # Setup trial list
-    stim_freq = np.random.binomial(1, 0.5, n_trials)
+    predicted_n_trials = duration/(soa+0.5)
+    
+    record_duration = np.float32(duration)
+    if mode == '2 stimuli':
+        markernames = [1, 2]
+    elif mode == '7 stimuli':
+        markernames = [1, 2, 3, 4, 5, 6, 7]
+        
+    elif mode == '8 stimuli':
+        markernames = [1, 2, 3, 4, 5, 6, 7, 8]
+  
+    # Setup trial 
+    stim_freq = np.array(np.random.uniform(0, len(markernames)-1, n_trials), dtype=np.int)
+    pdb.set_trace()
+    #stim_freq = np.random.binomial(markernames, 0.5, n_trials)
     print(f"Stim freq: {stim_freq}")
     trials = DataFrame(dict(stim_freq=stim_freq, timestamp=np.zeros(n_trials)))
-
+    print(f"Trials: {trials}")
     # Set up graphics
     mywin = visual.Window([1600, 900], monitor="testMonitor", units="deg", fullscr=True)
     grating = visual.GratingStim(win=mywin, mask="circle", size=80, sf=0.2)
@@ -76,7 +88,8 @@ def present(duration=120, eeg=None, save_fn=None):
         print(f"freqs: {freqs}")
         return freqs
 
-    def init_flicker_stim(frame_rate, cycle, soa):
+
+    def init_flicker_stim(frame_rate, cycle, soa): 
         """Initialize flickering stimulus.
         Get parameters for a flickering stimulus, based on the screen refresh
         rate and the desired stimulation cycle.
@@ -98,30 +111,58 @@ def present(duration=120, eeg=None, save_fn=None):
         """
         if isinstance(cycle, tuple):
             stim_freq = frame_rate / sum(cycle)
-            n_cycles = int(soa * stim_freq)
+            n_cycles = int(soa * stim_freq) # number of cycles in one stimulus trial
         else:
             stim_freq = frame_rate / cycle
-            cycle = (cycle, cycle)
-            n_cycles = int(soa * stim_freq) / 2
+            cycle = (cycle, cycle) 
+            n_cycles = int(soa * stim_freq) / 2 # Number of cycles in one stimulus trial
 
         return {"cycle": cycle, "freq": stim_freq, "n_cycles": n_cycles}
-
+    #-------------------------------------------------------------------------
+    # Generate the possible ssvep frequencies based on monitor refresh rate. The standard monitor refresh rate is 60Hz
     # Set up stimuli
+    print("-----------------------------------------------------")
+    print("mode: ", mode)
+    print("-----------------------------------------------------")
     frame_rate = np.round(mywin.getActualFrameRate())  # Frame rate, in Hz
     freqs = get_possible_ssvep_freqs(frame_rate, stim_type="reversal")
-    print(f"freqs: {freqs}")
-    stim_patterns = [
-        init_flicker_stim(frame_rate, 2, soa),
-        init_flicker_stim(frame_rate, 3, soa),
-    ]
+    if mode == '2 stimuli':
+        stim_patterns = [
+            init_flicker_stim(frame_rate, 2, soa),    # call init_flicker_stim with 2 cycles. Meaning 30 hz
+            init_flicker_stim(frame_rate, 3, soa),    # call init_flicker_stim with 3 cycles. Meaning 20 hz
+        ]
+    elif mode == '7 stimuli':
+        stim_patterns = [
 
-    print(
-        (
-            "These Flickering frequencies (Hz): {}\n".format(
-                [stim_patterns[0]["freq"], stim_patterns[1]["freq"]]
-            )
-        )
-    )
+            init_flicker_stim(frame_rate, freqs[6.0][0], soa),# 6Hz    
+            init_flicker_stim(frame_rate, freqs[7.5][0], soa), # 7.5Hz
+            init_flicker_stim(frame_rate, freqs[10.0][0], soa), # 10Hz
+            init_flicker_stim(frame_rate, freqs[12.0][0], soa), # 12.5Hz
+            init_flicker_stim(frame_rate, freqs[15.0][0], soa), # 15Hz
+            init_flicker_stim(frame_rate, 2, soa),    # call init_flicker_stim with 2 cycles. Meaning 30 hz
+            init_flicker_stim(frame_rate, 3, soa),    # call init_flicker_stim with 3 cycles. Meaning 20 hz
+        ]
+    elif mode == '8 stimuli':
+        stim_patterns = [
+
+            init_flicker_stim(frame_rate, freqs[6.0], soa),# 6Hz    
+            init_flicker_stim(frame_rate, freqs[7.5], soa), # 7.5Hz
+            init_flicker_stim(frame_rate, freqs[10.0], soa), # 10Hz
+            init_flicker_stim(frame_rate, freqs[12.0], soa), # 12.5Hz
+            init_flicker_stim(frame_rate, freqs[15.0], soa), # 15Hz
+            init_flicker_stim(frame_rate, freqs[20.0], soa), # 20Hz
+            init_flicker_stim(frame_rate, freqs[30.0], soa), # 30Hz
+            init_flicker_stim(frame_rate, freqs[60.0], soa), # 60Hz
+        ]
+ 
+   
+    # print(
+    #     (
+    #         "These Flickering frequencies (Hz): {}\n".format(
+    #             [stim_patterns[0]["freq"], stim_patterns[1]["freq"]]
+    #         )
+    #     )
+    # )
 
     # Show the instructions screen
     show_instructions(duration)
@@ -133,17 +174,17 @@ def present(duration=120, eeg=None, save_fn=None):
             print(
                 f"No path for a save file was passed to the experiment. Saving data to {save_fn}"
             )
-        eeg.start(save_fn, duration=record_duration)
+        eeg.start(save_fn, duration=record_duration) # Start the EEG stream with the desired duration (in seconds)
 
     # Iterate through trials
     start = time()
     for ii, trial in trials.iterrows():
         # Intertrial interval
-        core.wait(iti + np.random.rand() * jitter)
+        core.wait(iti + np.random.rand() * jitter) # Wait for the intertrial interval (iti) plus a random jitter
 
         # Select stimulus frequency
-        ind = trials["stim_freq"].iloc[ii]
-
+        ind = trials["stim_freq"].iloc[ii] 
+    
         # Push sample
         if eeg:
             timestamp = time()
@@ -151,17 +192,17 @@ def present(duration=120, eeg=None, save_fn=None):
                 marker = [markernames[ind]]
             else:
                 marker = markernames[ind]
-            eeg.push_sample(marker=marker, timestamp=timestamp)
+            eeg.push_sample(marker=marker, timestamp=timestamp) # Push timestamp marker to notate start of trial
 
         # Present flickering stim
-        for _ in range(int(stim_patterns[ind]["n_cycles"])):
-            grating.setAutoDraw(True)
-            for _ in range(int(stim_patterns[ind]["cycle"][0])):
-                mywin.flip()
-            grating.setAutoDraw(False)
-            grating_neg.setAutoDraw(True)
-            for _ in range(stim_patterns[ind]["cycle"][1]):
-                mywin.flip()
+        for _ in range(int(stim_patterns[ind]["n_cycles"])): # Iterate through stimulation frequencies
+            grating.setAutoDraw(True) # Draw the grating
+            for _ in range(int(stim_patterns[ind]["cycle"][0])): # Iterate through on periods
+                mywin.flip() # Flip the screen
+            grating.setAutoDraw(False)  # Turn off grating
+            grating_neg.setAutoDraw(True) # Draw the negative grdating
+            for _ in range(stim_patterns[ind]["cycle"][1]): # Iterate through off periods
+                mywin.flip() # Flip the screen
             grating_neg.setAutoDraw(False)
 
         # offset
@@ -172,7 +213,7 @@ def present(duration=120, eeg=None, save_fn=None):
 
     # Cleanup
     if eeg:
-        eeg.stop()
+        eeg.stop() # stop all data
     mywin.close()
 
 
